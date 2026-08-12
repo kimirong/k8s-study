@@ -1,0 +1,35 @@
+# Ingress 规则：按域名（Host）路由到不同应用
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"   # ★ 强制 HTTP→HTTPS 跳转
+spec:
+  ingressClassName: nginx          # 指定用哪个 Ingress Controller（nginx）
+  tls:                             # ★ HTTPS：为这些域名启用加密
+  - hosts:
+    - hello.test.com
+    - spring.test.com
+    secretName: app-tls            # 证书存哪个 Secret（kubernetes.io/tls 类型）
+  rules:
+  - host: hello.test.com           # 域名 A → nginx 应用
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: hello            # 转发给 Service 的名字
+            port:
+              number: 80           # Service 的端口（不是 NodePort）
+  - host: spring.test.com          # 域名 B → Spring Boot 应用
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: hello-spring
+            port:
+              number: 8080

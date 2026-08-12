@@ -1,0 +1,82 @@
+# ============ PV：真实存在的"一块盘"（hostPath，绑定 worker1）============
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mysql-pv
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes: ["ReadWriteOnce"]        # 单节点读写（MySQL 够用）
+  persistentVolumeReclaimPolicy: Retain  # 盘释放后不自动删数据
+  storageClassName: manual              # 手动创建的盘，归到 manual 类
+  nodeAffinity:                         # ★ 强制这块盘只在 worker1 上
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values: ["k8s-worker1"]
+  hostPath:
+    path: /data/mysql
+---
+# ============ PVC：应用的"存储申请单"============
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 2Gi
+  storageClassName: manual              # 指定要 manual 类的盘
+---
+# ============ MySQL Deployment：数据挂到 PVC ============
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  labels:
+    app: mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - name: mysql
+        image: docker.m.daocloud.io/library/mysql:8.0
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:                    # ★ 密码从第 7 课的 Secret 来
+            secretKeyRef:
+              name: app-secret
+              key: DB_PASSWORD
+        - name: MYSQL_DATABASE
+          value: mydb
+        ports:
+        - containerPort: 3306
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/mysql      # ★ MySQL 数据目录挂到 PVC 上
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: mysql-pvc
+---
+# ============ Service：让其他应用能连 MySQL ============
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+spec:
+  selector:
+    app: mysql
+  ports:
+  - port: 3306
+    targetPort: 3306

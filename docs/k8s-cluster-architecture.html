@@ -1,0 +1,258 @@
+<title>Kubernetes 集群架构图</title>
+<style>
+  :root{
+    --bg:#f6f7fb;
+    --ink:#1c2536;
+    --muted:#5d6c81;
+    --line:#d8dee9;
+    --panel:#ffffff;
+    --master:#edf1fb;
+    --worker:#f2f4f9;
+    --hub:#3b5bdb;
+    --hub-fill:#eef1fe;
+    --traffic:#0e9f6e;
+    --traffic-fill:#e6f6f0;
+    --traffic-ink:#0a7a54;
+    --font-body:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Helvetica Neue",Roboto,sans-serif;
+    --font-mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0e1520;
+      --ink:#e7edf6;
+      --muted:#94a3b8;
+      --line:#2b3950;
+      --panel:#141c2a;
+      --master:#18233a;
+      --worker:#161f2d;
+      --hub:#9fb0ff;
+      --hub-fill:#222b4d;
+      --traffic:#34d399;
+      --traffic-fill:#103129;
+      --traffic-ink:#6ee7b7;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0e1520;
+    --ink:#e7edf6;
+    --muted:#94a3b8;
+    --line:#2b3950;
+    --panel:#141c2a;
+    --master:#18233a;
+    --worker:#161f2d;
+    --hub:#9fb0ff;
+    --hub-fill:#222b4d;
+    --traffic:#34d399;
+    --traffic-fill:#103129;
+    --traffic-ink:#6ee7b7;
+  }
+
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font-family:var(--font-body);line-height:1.6;-webkit-font-smoothing:antialiased;margin:0}
+  main{max-width:1060px;margin:0 auto;padding:56px 28px 80px}
+  .eyebrow{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:600;margin:0 0 12px}
+  h1{font-size:34px;line-height:1.2;margin:0 0 14px;letter-spacing:-.01em;text-wrap:balance}
+  .lede{color:var(--muted);font-size:16px;max-width:64ch;margin:0}
+  figure{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px 22px 18px;margin:34px 0 0;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+  svg{width:100%;height:auto;display:block}
+  .legend{display:flex;flex-wrap:wrap;gap:18px;font-size:12.5px;color:var(--muted);margin-top:12px}
+  .swatch{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:7px;vertical-align:-1px}
+  figcaption{margin-top:14px;font-size:14px;color:var(--muted);line-height:1.65}
+  h2{font-size:22px;margin:46px 0 4px;letter-spacing:-.01em}
+  .take-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:18px}
+  .take{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 18px 16px}
+  .take h3{margin:0 0 8px;font-size:15.5px}
+  .take p{margin:0;font-size:14px;color:var(--muted);line-height:1.7}
+  footer{margin-top:46px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+
+  /* SVG 元素样式 —— 全部走主题 token */
+  svg{font-family:var(--font-body)}
+  .band-master{fill:var(--master);stroke:var(--line);stroke-width:1.3}
+  .band-worker{fill:var(--worker);stroke:var(--line);stroke-width:1.3}
+  .node-box{fill:var(--panel);stroke:var(--line);stroke-width:1.3}
+  .box-hub{fill:var(--hub-fill);stroke:var(--hub);stroke-width:1.8}
+  .box-pod{fill:var(--panel);stroke:var(--traffic);stroke-width:1.5;stroke-dasharray:5 4}
+  .box-data{fill:var(--traffic-fill);stroke:var(--traffic);stroke-width:1.7}
+  .callout{fill:var(--traffic-fill);stroke:var(--traffic);stroke-width:1.3;stroke-dasharray:4 3}
+  .arrow{stroke:currentColor;stroke-width:1.6;fill:none}
+  .arrow-dash{stroke:currentColor;stroke-width:1.4;stroke-dasharray:5 4;fill:none}
+  .arrow-data{stroke:var(--traffic);stroke-width:2.2;fill:none}
+  .bandlabel{font-size:13px;font-weight:700;fill:var(--ink)}
+  .comp{font-size:12.5px;font-weight:700;fill:var(--ink)}
+  .sub{font-size:11px;fill:var(--muted)}
+  .label{font-size:11.5px;fill:var(--ink)}
+  .label-sub{font-size:10.5px;fill:var(--muted)}
+  .nstep{fill:var(--hub);font-weight:700}
+  .mono{font-family:var(--font-mono);letter-spacing:-.01em}
+  .monodim{font-family:var(--font-mono);fill:var(--muted);font-size:11.5px;letter-spacing:-.01em}
+</style>
+
+<main>
+  <p class="eyebrow">K8S 学习 · 第 1 张图</p>
+  <h1>Kubernetes 集群架构图</h1>
+  <p class="lede">你不需要先啃文档——先看懂这张图，之后看到的任何 k8s 概念都能对号入座。下面两幅图分别讲清楚两件事：集群怎么把一次部署变成现实（控制面），以及你的请求怎么打到你的应用（数据面）。</p>
+
+  <figure>
+    <svg viewBox="0 0 1000 800" role="img" aria-label="控制面架构图：所有组件只通过 kube-apiserver 通信，etcd 是唯一状态源">
+      <defs>
+        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 1 L 9 5 L 0 9 z" fill="context-stroke"/>
+        </marker>
+      </defs>
+
+      <!-- 控制面带 -->
+      <rect class="band-master" x="30" y="110" width="940" height="280" rx="18"/>
+      <text class="bandlabel" x="50" y="141">Master 节点 — 控制面 <tspan class="monodim">Control Plane</tspan></text>
+
+      <!-- kubectl -->
+      <rect class="node-box" x="395" y="20" width="210" height="54" rx="10"/>
+      <text class="comp" text-anchor="middle" x="500" y="44">开发者 / <tspan class="mono">kubectl</tspan></text>
+      <text class="sub" text-anchor="middle" x="500" y="62">apply -f app.yaml</text>
+
+      <!-- ① kubectl -> apiserver -->
+      <line class="arrow" x1="500" y1="74" x2="500" y2="145" marker-end="url(#ah)"/>
+      <text class="label" x="512" y="110"><tspan class="nstep">①</tspan> 提交期望状态 <tspan class="mono">(YAML)</tspan></text>
+
+      <!-- kube-apiserver -->
+      <rect class="box-hub" x="395" y="145" width="210" height="60" rx="10"/>
+      <text class="comp" text-anchor="middle" x="500" y="169">kube-apiserver</text>
+      <text class="sub" text-anchor="middle" x="500" y="188">唯一入口 · 所有通信枢纽</text>
+
+      <!-- kube-scheduler -->
+      <rect class="node-box" x="55" y="150" width="190" height="52" rx="10"/>
+      <text class="comp" text-anchor="middle" x="150" y="170">kube-scheduler</text>
+      <text class="sub" text-anchor="middle" x="150" y="187">决定 Pod 放哪台节点</text>
+
+      <!-- controller-manager -->
+      <rect class="node-box" x="755" y="150" width="190" height="52" rx="10"/>
+      <text class="comp" text-anchor="middle" x="850" y="170">controller-manager</text>
+      <text class="sub" text-anchor="middle" x="850" y="187">保证实际状态 = 期望状态</text>
+
+      <!-- ② scheduler <-> apiserver -->
+      <line class="arrow" x1="245" y1="176" x2="395" y2="176" marker-start="url(#ah)" marker-end="url(#ah)"/>
+      <text class="label" text-anchor="end" x="387" y="168"><tspan class="nstep">②</tspan> Watch 新 Pod → 回报结果</text>
+
+      <!-- ③ controller-manager <-> apiserver -->
+      <line class="arrow" x1="605" y1="176" x2="755" y2="176" marker-start="url(#ah)" marker-end="url(#ah)"/>
+      <text class="label" x="613" y="168"><tspan class="nstep">③</tspan> Watch 期望 → 调谐</text>
+
+      <!-- etcd -->
+      <rect class="node-box" x="55" y="320" width="190" height="48" rx="10"/>
+      <text class="comp" text-anchor="middle" x="150" y="342">etcd</text>
+      <text class="sub" text-anchor="middle" x="150" y="358">集群状态数据库 · 真相源</text>
+
+      <!-- ④ apiserver <-> etcd -->
+      <path class="arrow" d="M 395 185 L 300 185 L 300 344 L 245 344" marker-start="url(#ah)" marker-end="url(#ah)"/>
+      <text class="label" x="62" y="303"><tspan class="nstep">④</tspan> 唯一数据源（只读/写它）</text>
+
+      <!-- ⑤ 主干：apiserver -> kubelet -->
+      <line class="arrow" x1="500" y1="205" x2="500" y2="415" marker-end="url(#ah)"/>
+      <text class="label" x="512" y="300"><tspan class="nstep">⑤</tspan> 下发任务 / 上报实际状态</text>
+
+      <line class="arrow" x1="165" y1="415" x2="625" y2="415" marker-start="url(#ah)" marker-end="url(#ah)"/>
+      <line class="arrow" x1="165" y1="415" x2="165" y2="510" marker-start="url(#ah)" marker-end="url(#ah)"/>
+      <line class="arrow" x1="625" y1="415" x2="625" y2="510" marker-start="url(#ah)" marker-end="url(#ah)"/>
+
+      <!-- Worker 带 -->
+      <rect class="band-worker" x="30" y="430" width="940" height="330" rx="18"/>
+      <text class="bandlabel" x="50" y="462">Worker 节点 — 运行你的应用 <tspan class="monodim">Workers</tspan></text>
+
+      <!-- Worker 1 -->
+      <rect class="node-box" x="60" y="475" width="420" height="255" rx="12"/>
+      <text class="comp" x="78" y="499">Worker 1 节点</text>
+      <rect class="node-box" x="85" y="510" width="160" height="46" rx="8"/>
+      <text class="comp" text-anchor="middle" x="165" y="529">kubelet</text>
+      <text class="sub" text-anchor="middle" x="165" y="546">节点上的代理</text>
+      <rect class="node-box" x="290" y="510" width="160" height="46" rx="8"/>
+      <text class="comp" text-anchor="middle" x="370" y="529">kube-proxy</text>
+      <text class="sub" text-anchor="middle" x="370" y="546">Service 转发规则</text>
+      <rect class="node-box" x="85" y="600" width="160" height="44" rx="8"/>
+      <text class="comp" text-anchor="middle" x="165" y="619">containerd</text>
+      <text class="sub" text-anchor="middle" x="165" y="634">容器运行时</text>
+      <rect class="box-pod" x="290" y="600" width="160" height="95" rx="10"/>
+      <text class="comp" text-anchor="middle" x="370" y="626">Pod</text>
+      <text class="sub" text-anchor="middle" x="370" y="644">你的 Spring Boot 容器</text>
+      <line class="arrow" x1="165" y1="556" x2="165" y2="600" marker-end="url(#ah)"/>
+      <line class="arrow-dash" x1="370" y1="556" x2="370" y2="600" marker-end="url(#ah)"/>
+      <text class="label-sub" x="379" y="583">转发规则</text>
+      <line class="arrow" x1="245" y1="622" x2="290" y2="622" marker-end="url(#ah)"/>
+      <text class="label-sub" x="267" y="596" text-anchor="middle">启动容器</text>
+
+      <!-- Worker 2 -->
+      <rect class="node-box" x="520" y="475" width="420" height="255" rx="12"/>
+      <text class="comp" x="538" y="499">Worker 2 节点</text>
+      <rect class="node-box" x="545" y="510" width="160" height="46" rx="8"/>
+      <text class="comp" text-anchor="middle" x="625" y="529">kubelet</text>
+      <text class="sub" text-anchor="middle" x="625" y="546">节点上的代理</text>
+      <rect class="node-box" x="750" y="510" width="160" height="46" rx="8"/>
+      <text class="comp" text-anchor="middle" x="830" y="529">kube-proxy</text>
+      <text class="sub" text-anchor="middle" x="830" y="546">Service 转发规则</text>
+      <rect class="node-box" x="545" y="600" width="160" height="44" rx="8"/>
+      <text class="comp" text-anchor="middle" x="625" y="619">containerd</text>
+      <text class="sub" text-anchor="middle" x="625" y="634">容器运行时</text>
+      <rect class="box-pod" x="750" y="600" width="160" height="95" rx="10"/>
+      <text class="comp" text-anchor="middle" x="830" y="626">Pod</text>
+      <text class="sub" text-anchor="middle" x="830" y="644">你的 Spring Boot 容器</text>
+      <line class="arrow" x1="625" y1="556" x2="625" y2="600" marker-end="url(#ah)"/>
+      <line class="arrow-dash" x1="830" y1="556" x2="830" y2="600" marker-end="url(#ah)"/>
+      <text class="label-sub" x="839" y="583">转发规则</text>
+      <line class="arrow" x1="705" y1="622" x2="750" y2="622" marker-end="url(#ah)"/>
+      <text class="label-sub" x="727" y="596" text-anchor="middle">启动容器</text>
+    </svg>
+
+    <div class="legend">
+      <span><span class="swatch" style="background:var(--hub)"></span>控制面 —— 集群自己协调</span>
+      <span><span class="swatch" style="background:var(--traffic)"></span>数据面 —— 你的业务流量</span>
+    </div>
+    <figcaption><strong>图 1 · 一次部署请求如何变成运行中的 Pod</strong>（编号即请求的旅程）。整幅图最值得记住的一件事：<strong>所有组件都只通过 kube-apiserver 通信，etcd 是集群唯一的「状态真相源」</strong>——kubelet 不会直接问 etcd，你的 kubectl 也不会。</figcaption>
+  </figure>
+
+  <figure>
+    <svg viewBox="0 0 1000 340" role="img" aria-label="数据面架构图：浏览器经 Ingress、Service 到达 Pod">
+      <rect class="node-box" x="30" y="140" width="150" height="60" rx="10"/>
+      <text class="comp" text-anchor="middle" x="105" y="162">浏览器 / 用户</text>
+      <text class="sub" text-anchor="middle" x="105" y="180">HTTP 请求</text>
+
+      <rect class="box-data" x="260" y="140" width="180" height="60" rx="10"/>
+      <text class="comp" text-anchor="middle" x="350" y="162">Ingress</text>
+      <text class="sub" text-anchor="middle" x="350" y="180">7 层入口 · 按域名/路径路由</text>
+
+      <rect class="box-data" x="520" y="140" width="180" height="60" rx="10"/>
+      <text class="comp" text-anchor="middle" x="610" y="162">Service</text>
+      <text class="sub" text-anchor="middle" x="610" y="180">稳定入口 · ClusterIP + 域名</text>
+
+      <line class="arrow-data" x1="180" y1="170" x2="260" y2="170" marker-end="url(#ah)"/>
+      <text class="label-sub" text-anchor="middle" x="220" y="162">HTTP</text>
+      <line class="arrow-data" x1="440" y1="170" x2="520" y2="170" marker-end="url(#ah)"/>
+      <text class="label-sub" text-anchor="middle" x="480" y="162">按域名/路径转发</text>
+
+      <text class="label-sub" text-anchor="middle" x="860" y="52">在 Worker 1 上</text>
+      <rect class="box-data" x="770" y="60" width="180" height="80" rx="10"/>
+      <text class="comp" text-anchor="middle" x="860" y="88">Pod A</text>
+      <text class="sub" text-anchor="middle" x="860" y="106">Spring Boot 副本</text>
+
+      <text class="label-sub" text-anchor="middle" x="860" y="212">在 Worker 2 上</text>
+      <rect class="box-data" x="770" y="220" width="180" height="80" rx="10"/>
+      <text class="comp" text-anchor="middle" x="860" y="248">Pod B</text>
+      <text class="sub" text-anchor="middle" x="860" y="266">Spring Boot 副本</text>
+
+      <path class="arrow-data" d="M 700 170 H 740 V 100 H 770" marker-end="url(#ah)"/>
+      <path class="arrow-data" d="M 700 170 H 740 V 260 H 770" marker-end="url(#ah)"/>
+
+      <rect class="callout" x="420" y="248" width="315" height="64" rx="10"/>
+      <text class="comp" x="432" y="269">Pod 的 IP 会变，Service 不变</text>
+      <text class="label-sub" x="432" y="288">互相调用用 Service / 域名，别写死 Pod IP</text>
+    </svg>
+
+    <figcaption><strong>图 2 · 一次 HTTP 请求的完整路径</strong>（绿色 = 数据面）。你写代码时只需要关心 <strong>Ingress 和 Service</strong> 两个稳定入口；Pod 背后怎么伸缩、重启、换 IP，都是 k8s 和 kube-proxy 在悄悄处理。</figcaption>
+  </figure>
+
+  <h2>三句话建立心智模型</h2>
+  <div class="take-grid">
+    <div class="take"><h3>声明式，不是命令式</h3><p>你提交的是「想要什么」（期望状态），不是「怎么做」。controller-manager、kubelet 会把实际状态拉回期望状态——这就是 k8s 的核心循环，也是为什么它叫「自愈」。</p></div>
+    <div class="take"><h3>apiserver 是唯一的一扇门</h3><p>任何组件想读、想写集群状态都必须经过 kube-apiserver，etcd 藏在它后面、不对外。你只需要学一个 API，剩下的都是它内部的事。</p></div>
+    <div class="take"><h3>Pod 会死，Service 永存</h3><p>Pod 天生短暂——节点挂了、版本升级，它随时被重建并换个 IP。稳定的访问入口是 Service 和 Ingress。写配置时记住这句，就不会写错。</p></div>
+  </div>
+
+  <footer>下一站：按这张图，用 kubeadm 在 3 台服务器上逐台把控制面和 Worker 装出来——图里每个盒子，都是一次真实的部署。</footer>
+</main>

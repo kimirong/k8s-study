@@ -1,0 +1,12 @@
+# ============ 可配置参数（环境差异都在这改）============
+replicaCount: 2
+
+image:
+  repository: hello-spring        # 本地镜像名
+  tag: "1.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: NodePort
+  port: 8080
+  nodePort: 30082                 # 换个端口，避开已占用的 30081

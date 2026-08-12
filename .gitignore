@@ -1,0 +1,15 @@
+# ⚠️ 敏感文件（含密码/凭据，绝不提交）
+linux-service.md
+docs/dashboard-token.txt
+
+# 构建产物
+hello-springboot/target/
+*.tar
+*.tgz
+
+# 临时文件
+*.log
+*.tmp
+
+# macOS
+.DS_Store

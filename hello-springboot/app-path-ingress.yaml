@@ -1,0 +1,29 @@
+# 进阶：同一域名，按路径分流到不同应用
+# rewrite-target 注解：把匹配到的路径前缀去掉再转发
+#   /spring/hello  → 去掉 /spring → 转发 /hello 给 Spring Boot
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-path-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: app.test.com
+    http:
+      paths:
+      - path: /hello(/|$)(.*)          # 正则路径：/hello 开头
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: hello
+            port:
+              number: 80
+      - path: /spring(/|$)(.*)         # 正则路径：/spring 开头
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: hello-spring
+            port:
+              number: 8080

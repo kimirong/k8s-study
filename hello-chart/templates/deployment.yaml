@@ -1,0 +1,23 @@
+# 模板：用 {{ .Values.xxx }} 引用 values.yaml 里的值
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}                 # Release 名
+  labels:
+    app: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}
+    spec:
+      containers:
+      - name: {{ .Chart.Name }}             # Chart 名
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - containerPort: {{ .Values.service.port }}

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: hello-chart
+description: 把 hello-spring 打包成 Helm chart（学习用最小版）
+type: application
+version: 0.1.0          # chart 版本
+appVersion: "1.0"      # 应用版本
