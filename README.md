@@ -51,4 +51,4 @@
 
 ## ⚠️ 安全声明
 
-`linux-service.md`（服务器密码）与 `docs/dashboard-token.txt`（集群 token）**仅存在于本地**，已通过 `.gitignore` 排除，不会进入仓库。请勿将真实服务器凭据上传到任何公开仓库。
+`linux-service.md`（服务器信息）与 `docs/dashboard-token.txt`（集群 token）中的**真实凭据已脱敏**（对应服务器已释放）。请勿将真实密码/token 上传到公开仓库——公开仓库会被永久索引，删除了也难抹干净。

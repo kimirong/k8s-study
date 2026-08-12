@@ -1,0 +1,6 @@
+[此文件为 Dashboard 登录 token 的占位文件]
+
+⚠️ 原始 token 已脱敏（1 年有效期的管理员凭据，不进入公开仓库）。
+
+如需重新生成，在集群上执行：
+  kubectl -n kubernetes-dashboard create token admin-user
