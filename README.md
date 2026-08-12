@@ -11,7 +11,7 @@
 
 | 阶段 | 课程 | 核心收获 |
 |------|------|----------|
-| 搭建 | [第 0 课](docs/notes/lesson-00-cluster-setup.md) | kubeadm 搭 3 节点集群，国内网络镜像方案 |
+| 搭建 | [第 0 课](docs/notes/lesson-00-cluster-setup.md) | 服务器申请流程 + kubeadm 搭 3 节点集群 + 国内镜像方案 |
 | 基础 | [第 1 课](docs/notes/lesson-01-kubectl-basics.md) | kubectl 三板斧、资源层级、Events 时间线 |
 | | [第 2 课](docs/notes/lesson-02-yaml-declarative.md) | Deployment/Service YAML、labels、调谐自愈 |
 | 应用 | [第 3 课](docs/notes/lesson-03-springboot.md) | 用 Jib 打包并部署 Spring Boot |
