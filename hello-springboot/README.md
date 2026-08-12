@@ -21,7 +21,8 @@ mvn jib:buildTar -Djib.to.image=hello-spring:1.0
 
 | 文件 | 内容 | 对应课程 |
 |------|------|----------|
-| `hello-spring.yaml` | 基础 Deployment + NodePort Service | 第 2/3 课 |
+| `hello.yaml` | **nginx 示例应用**（Deployment + NodePort），第 2 课起的基础试验品 | 第 2 课 |
+| `hello-spring.yaml` | Spring Boot 的基础 Deployment + NodePort Service | 第 3 课 |
 | `app-ingress.yaml` | 域名分流 Ingress + HTTPS + 强制跳转 | 第 6/8 课 |
 | `app-path-ingress.yaml` | 同一域名按路径分流（rewrite） | 第 6 课 |
 | `config-demo.yaml` | ConfigMap + Secret + envFrom 注入 | 第 7 课 |

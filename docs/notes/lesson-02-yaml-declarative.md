@@ -87,6 +87,59 @@ Service    ──selector: app=hello──► 同一批 Pod
 
 > **k8s 的正道：YAML 文件是唯一"期望状态"来源，一切变更都改文件再 apply。**
 
+## 部署示例应用（后面的实验都基于它）
+
+本课的实验都围绕一个 nginx 应用 `hello`。完整文件在仓库 `hello-springboot/hello.yaml`（就是上面两节解读的那份拼在一起），部署它：
+
+```yaml
+# hello.yaml —— Deployment + Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello
+  labels:
+    app: hello
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: hello
+  template:
+    metadata:
+      labels:
+        app: hello
+    spec:
+      containers:
+      - name: nginx
+        image: docker.m.daocloud.io/library/nginx:alpine
+        ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello
+spec:
+  type: NodePort
+  selector:
+    app: hello
+  ports:
+  - port: 80
+    targetPort: 80
+    nodePort: 30080
+```
+
+```bash
+# 上传并部署（[本机] = 你的电脑，[master] = k8s-master）
+[本机] scp hello-springboot/hello.yaml root@<master>:/root/
+[master] export KUBECONFIG=/etc/kubernetes/admin.conf
+[master] kubectl apply -f /root/hello.yaml
+[master] kubectl get pods -o wide     # 两个 nginx Pod 起来了
+[master] curl http://127.0.0.1:30080  # nginx 欢迎页（多刷几次能看到负载均衡）
+```
+
+> 之后第 6 课 Ingress 也会用到这个 `hello`；第 3 课起的实验对象是 Spring Boot 的 `hello-spring`。
+
 ## 动手实验记录
 
 ```bash

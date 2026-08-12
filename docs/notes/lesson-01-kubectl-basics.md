@@ -57,6 +57,9 @@ Started    → 容器启动
 
 ## 动手实验记录
 
+> 下面命令基于 nginx 的 `hello` 应用（第 2 课会部署它，文件在仓库 `hello-springboot/hello.yaml`）。
+> 如果还没部署，先按第 2 课"部署示例应用"创建；或把命令里的 `hello` 换成集群里已有的资源。
+
 ```bash
 kubectl get pods                       # 看 Pod
 kubectl get pods -o wide               # 看 IP 和节点
