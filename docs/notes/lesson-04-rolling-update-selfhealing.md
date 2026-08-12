@@ -20,6 +20,16 @@ k8s 升级应用不是"停服换新"，而是**滚动**替换：
 
 ### 实操
 
+> ⚠️ 前提：**新版本镜像必须先存在**。升级前要改代码 → 重新构建 → 分发到所有节点（步骤同第 3 课）：
+> ```bash
+> # ① 改代码（如 HelloController 的返回值）→ 传到 master → 重新打镜像
+> [master] cd /root/hello-springboot
+> [master] mvn -q -DskipTests package
+> [master] mvn -q jib:buildTar -Djib.to.image=hello-spring:2.0   # 打 v2.0
+> # ② master 导入 + 分发到两台 worker + worker 导入（步骤同第 3 课 ③④⑤）
+> ```
+> 镜像就位后，再执行下面的升级：
+
 ```bash
 # 方式一（声明式，推荐）：改 YAML 的 image 版本 → apply
 kubectl apply -f hello-spring.yaml
@@ -57,14 +67,17 @@ kubectl rollout undo deployment/hello-spring --to-revision=1   # 回滚到指定
 | ② Pod 被删/节点挂 | Pod 消失 | ReplicaSet 重建**全新 Pod** | 新名字、新 IP |
 
 ```bash
-# ① 容器重启（在 Worker 上杀容器 runtime task）
-ctr -n k8s.io c list | grep <pod名>          # 找到容器 ID
-ctr -n k8s.io task kill <容器ID> -s SIGKILL
-kubectl get pods                             # RESTARTS 变成 1
+# ① 容器重启（在"Pod 所在的那台节点"上杀容器 task，而不是随便一台）
+#    先确认 Pod 在哪个节点：kubectl get pods -o wide 看 NODE 列
+kubectl get pods -o wide
+#    然后 SSH 到那台节点上执行：
+ctr -n k8s.io c list | grep <pod名>          # 找到容器 ID（第一列）
+ctr -n k8s.io task kill <容器ID> -s SIGKILL  # 杀容器主进程
+#    回 master 看：RESTARTS 变成 1（同一 Pod，容器被重启）
 
-# ② Pod 重建
+# ② Pod 重建（在 master 上）
 kubectl delete pod <pod名>
-kubectl get pods -o wide                     # 新 Pod 出现
+kubectl get pods -o wide                     # 新 Pod 出现（新名字、新 IP）
 ```
 
 ### 踩坑记录：容器里 `kill -9 1` 杀不死 Java

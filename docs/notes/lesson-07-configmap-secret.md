@@ -55,18 +55,24 @@ volumes:
   └─ 改配置 → kubectl rollout restart → 生效（不用重新打镜像！）
 ```
 
-**验证过的实操**：
+**验证过的实操**（完整流程）：
 ```bash
-# 创建
+# ① 创建 ConfigMap 和 Secret
 kubectl create configmap app-config --from-literal=APP_MODE=dev --from-literal=LOG_LEVEL=INFO
 kubectl create secret generic app-secret --from-literal=DB_PASSWORD=SuperSecret123
 
-# 改配置（dev→prod），重启生效
+# ② ★ 把配置注入 Deployment（没有这一步，Pod 里是拿不到这些变量的）
+#    仓库里有一份完整的 config-demo.yaml（ConfigMap + Secret + 带 envFrom 的 Deployment），直接用它：
+kubectl apply -f hello-springboot/config-demo.yaml
+#    或手动给已有 Deployment 加 envFrom（见上面"三种注入方式"的 YAML），然后 apply
+
+# ③ 验证注入生效
+kubectl exec <pod> -- env | grep -E "APP_MODE|DB_PASSWORD"
+
+# ④ 改配置（dev→prod），重启生效（注意：不用重新打镜像！）
 kubectl create configmap app-config --from-literal=APP_MODE=prod --from-literal=LOG_LEVEL=DEBUG --dry-run=client -o yaml | kubectl apply -f -
 kubectl rollout restart deployment/hello-spring
-
-# 验证注入
-kubectl exec <pod> -- env | grep -E "APP_MODE|DB_PASSWORD"
+kubectl exec <新pod> -- env | grep APP_MODE    # 变成 prod
 ```
 
 > ⚠️ 注意：envFrom 注入的配置**修改后要重启 Pod 才生效**（env 是启动时读取的）。挂载成文件的配置有延迟但会自动更新。

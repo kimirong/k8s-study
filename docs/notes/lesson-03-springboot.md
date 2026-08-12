@@ -54,28 +54,47 @@ readinessProbe:
 
 ## 动手实验记录
 
+> 约定：`[本机]` = 你的电脑，`[master]` = k8s-master，`[worker]` = 两台 worker
+
 ```bash
-# ① 构建（在 master，装有 JDK17 + Maven）
-cd /root/hello-springboot
-mvn -q -DskipTests package          # 打 jar
-mvn -q jib:buildTar                 # 构建镜像 tar
+# 前置：master 上装 JDK 17 + Maven（一次）
+[master] apt-get install -y openjdk-17-jdk-headless maven
 
-# ② 导入镜像（master）
-ctr -n k8s.io images import target/jib-image.tar
+# ① 项目传到 master（项目在仓库的 hello-springboot/ 目录）
+[本机] scp -r hello-springboot root@<master>:/root/
 
-# ③ 分发到 worker（走内网，先给 master 配好到 worker 的免密）
-scp /root/hello-springboot/target/jib-image.tar root@10.0.0.195:/root/
-scp /root/hello-springboot/target/jib-image.tar root@10.0.0.196:/root/
-# 在每台 worker 上：
-ctr -n k8s.io images import /root/jib-image.tar
+# ② 构建镜像（Jib，不需要 Docker）
+[master] cd /root/hello-springboot
+[master] mvn -q -DskipTests package     # 打 jar
+[master] mvn -q jib:buildTar            # 构建镜像 tar → target/jib-image.tar
 
-# ④ 部署
-kubectl apply -f hello-spring.yaml   # Deployment + NodePort Service
+# ③ master 导入镜像
+[master] ctr -n k8s.io images import target/jib-image.tar
 
-# ⑤ 验证
-kubectl get pods -l app=hello-spring -o wide
-curl http://127.0.0.1:30081/hello      # 多调几次，看 Pod 名交替 = 负载均衡
+# ④ 分发到 worker（走内网最快，先给 master 配到 worker 的免密，只需一次）
+#    在 master 上生成密钥并取公钥：
+[master] ssh-keygen -q -t ed25519 -N "" -f /root/.ssh/id_ed25519
+[master] cat /root/.ssh/id_ed25519.pub   # 复制输出的公钥
+#    把公钥追加到两台 worker 的 /root/.ssh/authorized_keys：
+[worker] echo "<上一步的公钥>" >> /root/.ssh/authorized_keys
+#    然后 master 走内网分发：
+[master] scp -o StrictHostKeyChecking=no /root/hello-springboot/target/jib-image.tar root@10.0.0.195:/root/
+[master] scp -o StrictHostKeyChecking=no /root/hello-springboot/target/jib-image.tar root@10.0.0.196:/root/
+
+# ⑤ 两台 worker 上导入镜像
+[worker] ctr -n k8s.io images import /root/jib-image.tar
+
+# ⑥ 上传部署清单并部署（hello-spring.yaml 在项目目录里）
+[本机] scp hello-springboot/hello-spring.yaml root@<master>:/root/
+[master] export KUBECONFIG=/etc/kubernetes/admin.conf
+[master] kubectl apply -f /root/hello-spring.yaml    # Deployment + NodePort Service
+
+# ⑦ 验证（多调几次，看 Pod 名交替 = 负载均衡）
+[master] kubectl get pods -l app=hello-spring -o wide
+[master] curl http://127.0.0.1:30081/hello
 ```
+
+> 💡 **镜像分发也可以一条命令走公网**（镜像小/带宽快时）：`[本机] scp -r hello-springboot/target/jib-image.tar root@<worker公网IP>:/root/`，然后在 worker 上导入。走内网只是更快。
 
 ## 验证结果
 

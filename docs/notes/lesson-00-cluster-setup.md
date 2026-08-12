@@ -82,18 +82,26 @@ net.ipv4.ip_forward                 = 1
 EOF
 sysctl --system
 
-# ③ 安装 containerd + 配置（SystemdCgroup、pause 镜像）
-apt-get install -y containerd
+# ③ 安装 containerd + 配置
+apt-get update && apt-get install -y containerd gnupg
 containerd config default > /etc/containerd/config.toml
-# 改 SystemdCgroup = true，sandbox_image 指向可用镜像源
+sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
 systemctl restart containerd
 
-# ④ 安装 kubeadm/kubelet/kubectl（国内源 pkgs.k8s.io 可达）
+# ④ ★ pause 镜像修复（不做的后果：kubelet 起 Pod 时去被墙的 registry.k8s.io 拉 pause，控制面起不来）
+# containerd 2.x 的 sandbox_image 配置实测不生效，最稳做法是预拉 + 改名成 kubelet 要的名字
+ctr -n k8s.io images pull registry.aliyuncs.com/google_containers/pause:3.10.1
+ctr -n k8s.io images tag registry.aliyuncs.com/google_containers/pause:3.10.1 registry.k8s.io/pause:3.10.1
+
+# ⑤ 安装 kubeadm/kubelet/kubectl（国内源 pkgs.k8s.io 可达）
+mkdir -p /etc/apt/keyrings
 curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/k8s-keyring.gpg
 echo "deb [signed-by=/etc/apt/keyrings/k8s-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /" > /etc/apt/sources.list.d/kubernetes.list
 apt-get update && apt-get install -y kubelet kubeadm kubectl
 apt-mark hold kubelet kubeadm kubectl
 ```
+
+> 以上 ③④⑤ 步骤**三台都要执行**（pause 镜像三台都要预拉）。
 
 ## 四、Master 初始化
 
@@ -110,14 +118,27 @@ export KUBECONFIG=/etc/kubernetes/admin.conf
 mkdir -p $HOME/.kube && cp /etc/kubernetes/admin.conf $HOME/.kube/config
 
 # 装网络插件 Calico（镜像走 daocloud）
-kubectl apply -f calico.yaml   # 镜像已改 docker.m.daocloud.io/calico/
+# ① 本机下载（master 访问不了 GitHub raw）
+curl -fsSL https://raw.githubusercontent.com/projectcalico/calico/v3.29.0/manifests/calico.yaml -o calico.yaml
+# ② 换镜像：docker.io/calico/  →  docker.m.daocloud.io/calico/
+sed -i 's|docker.io/calico/|docker.m.daocloud.io/calico/|g' calico.yaml
+# ③ 上传并应用
+scp calico.yaml root@<master>:/tmp/calico.yaml
+ssh root@<master> 'export KUBECONFIG=/etc/kubernetes/admin.conf; kubectl apply -f /tmp/calico.yaml'
+# ④ 等节点 Ready
+kubectl get nodes -w
 ```
+
+> ⚠️ 初始化完成后，**kubeadm init 会输出一段 join 命令**（含 token），务必保存下来，下一步 worker 加入要用。忘了可以 `kubeadm token create --print-join-command` 重新生成。
 
 ## 五、Worker 加入
 
 ```bash
 # master 上生成的 join 命令，在两台 worker 上执行
 kubeadm join 10.0.0.194:6443 --token <token> --discovery-token-ca-cert-hash sha256:<hash>
+
+# 两台都 join 后，回 master 验证
+kubectl get nodes    # 三台全部 Ready
 ```
 
 ## 六、验证
@@ -141,5 +162,5 @@ kubectl get pods -A        # 控制面 + calico 全部 Running
 |------|------|------|
 | `conntrack not found` | 缺依赖 | `apt-get install -y conntrack ethtool socat` |
 | `ImagePullBackOff` | 镜像拉不下来/不在本节点 | 换镜像源或内网分发 |
-| 控制面起不来（apiserver 超时） | pause 镜像被墙 | 预拉 pause 镜像改名到 registry.k8s.io/pause:3.10.1 |
+| 控制面起不来（apiserver 超时） | pause 镜像被墙 | 预拉 pause 改名（见初始化步骤④） |
 | `kubectl top` 500 | kubelet 自签证书 | metrics-server 加 `--kubelet-insecure-tls` |

@@ -9,6 +9,17 @@
 - dev/prod 环境差异要改来改去
 - 部署/升级/回滚没有版本管理
 
+## 安装 Helm
+
+Helm 是纯客户端工具（v3 不需要服务端组件），一条命令装好：
+
+```bash
+# 官方二进制源 get.helm.sh 国内可达
+curl -fsSL -o /tmp/helm.tgz https://get.helm.sh/helm-v3.15.4-linux-amd64.tar.gz
+tar -zxf /tmp/helm.tgz && mv linux-amd64/helm /usr/local/bin/helm
+helm version
+```
+
 ## 三剑客
 
 | 概念 | 是什么 | Java 类比 |

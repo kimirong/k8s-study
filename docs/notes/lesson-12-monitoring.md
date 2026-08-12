@@ -22,29 +22,54 @@ Metrics Server：轻量，只给 kubectl top 提供用量
 ## 安装过程（含国内网络实战）
 
 ### ① Metrics Server（5 分钟）
+> 约定：`[本机]` = 你的电脑，`[master]` = k8s-master
+
 ```bash
-# 清单在 GitHub，本机下载后换镜像上传
-curl -fsSL .../metrics-server/releases/latest/download/components.yaml
-sed -i 's|registry.k8s.io/|k8s.m.daocloud.io/|g' components.yaml
-kubectl apply -f components.yaml
+# 清单在 GitHub（本机下载，master 访问不了 GitHub raw）
+[本机] curl -fsSL https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml -o metrics-server.yaml
+# 换镜像：registry.k8s.io/ → k8s.m.daocloud.io/
+[本机] sed -i 's|registry.k8s.io/|k8s.m.daocloud.io/|g' metrics-server.yaml
+# 上传 + 部署
+[本机] scp metrics-server.yaml root@<master>:/tmp/
+[master] export KUBECONFIG=/etc/kubernetes/admin.conf
+[master] kubectl apply -f /tmp/metrics-server.yaml
 
-# 坑：kubeadm 的 kubelet 证书是自签的，要加 --kubelet-insecure-tls
-kubectl patch deployment metrics-server -n kube-system -p '{"spec":{"template":{"spec":{"containers":[{"name":"metrics-server","args":["--cert-dir=/tmp","--secure-port=10250","--kubelet-insecure-tls","--kubelet-preferred-address-types=InternalIP","--kubelet-use-node-status-port","--metric-resolution=15s"]}]}}}}'
+# 坑：kubeadm 的 kubelet 证书是自签的，要加 --kubelet-insecure-tls（否则探针报 500）
+[master] kubectl patch deployment metrics-server -n kube-system -p '{"spec":{"template":{"spec":{"containers":[{"name":"metrics-server","args":["--cert-dir=/tmp","--secure-port=10250","--kubelet-insecure-tls","--kubelet-preferred-address-types=InternalIP","--kubelet-use-node-status-port","--metric-resolution=15s"]}]}}}}'
 
-# 验证
-kubectl top nodes
+# 验证（等 API 就绪，约 30 秒）
+[master] kubectl top nodes
 ```
 
 ### ② kube-prometheus-stack（Prometheus 全家桶）
+
 ```bash
 # Helm 仓库被墙 → 本机下载 chart 包上传
-curl -fsSL .../helm-charts/releases/download/kube-prometheus-stack-66.0.0/...tgz -o kps.tgz
-# 渲染 + 全局替换镜像前缀（quay.io 也被墙！）
-helm template monitoring ./kube-prometheus-stack --set prometheus-adapter.enabled=false > monitoring.yaml
-sed -i 's|quay.io/|quay.m.daocloud.io/|g; s|registry.k8s.io/|k8s.m.daocloud.io/|g; s|docker.io/|docker.m.daocloud.io/|g; s|ghcr.io/|ghcr.m.daocloud.io/|g' monitoring.yaml
-# CRDs 在 charts/crds/crds/ 子目录
-kubectl apply --server-side -f .../charts/crds/crds/
-kubectl apply -f monitoring.yaml
+[本机] curl -fsSL https://github.com/prometheus-community/helm-charts/releases/download/kube-prometheus-stack-66.0.0/kube-prometheus-stack-66.0.0.tgz -o kps.tgz
+[本机] scp kps.tgz root@<master>:/tmp/
+
+# master 上：解包 + 渲染（所有资源变成一个大 YAML）
+[master] cd /tmp && tar -zxf kps.tgz
+[master] helm template monitoring ./kube-prometheus-stack --set prometheus-adapter.enabled=false > monitoring.yaml
+
+# 全局替换镜像前缀（quay.io 也被墙！daocloud 全家桶镜像站）
+[master] sed -i 's|quay.io/|quay.m.daocloud.io/|g; s|registry.k8s.io/|k8s.m.daocloud.io/|g; s|docker.io/|docker.m.daocloud.io/|g; s|ghcr.io/|ghcr.m.daocloud.io/|g' monitoring.yaml
+
+# 先装 CRDs（在 charts/crds/crds/ 子目录），再应用主体
+[master] kubectl apply --server-side -f /tmp/kube-prometheus-stack/charts/crds/crds/
+[master] kubectl apply -f /tmp/monitoring.yaml
+
+# 等 Pod 起来（首次拉镜像较久）
+[master] kubectl get pods -w
+```
+
+### ③ 暴露 Grafana（默认 ClusterIP，外部访问不到）
+
+```bash
+# Grafana Service 改成 NodePort 30300
+[master] kubectl patch svc monitoring-grafana -p '{"spec":{"type":"NodePort","ports":[{"port":80,"targetPort":3000,"nodePort":30300}]}}'
+# 取管理员密码
+[master] kubectl get secret monitoring-grafana -o jsonpath="{.data.admin-password}" | base64 -d
 ```
 
 ## Grafana 使用
@@ -70,6 +95,12 @@ management:
       exposure:
         include: health,prometheus
 ```
+> ⚠️ 改完代码要**重新构建镜像并分发到所有节点**（步骤同第 3/4 课），然后更新 Deployment 用新版本：
+> ```bash
+> [master] mvn -q -DskipTests package && mvn -q jib:buildTar -Djib.to.image=hello-spring:2.0
+> # 分发到两台 worker（第 3 课步骤④⑤），然后：
+> [master] kubectl set image deployment/hello-app hello-spring=hello-spring:2.0
+> ```
 验证：`curl <pod>:8080/actuator/prometheus` 能吐出 JVM 指标。
 
 ### ② Service 打标签 + 端口命名
